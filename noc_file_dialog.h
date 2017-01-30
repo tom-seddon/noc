@@ -73,6 +73,24 @@ const char *noc_file_dialog_open(int flags,
 #include <string.h>
 
 static char *g_noc_file_dialog_ret = NULL;
+static int noc_file_dialog_free_ret_registered = 0;
+
+static void noc_file_dialog_free_ret(void)
+{
+    free(g_noc_file_dialog_ret);
+    g_noc_file_dialog_ret = NULL;
+}
+
+static void noc_file_dialog_set_ret(char *str)
+{
+    if (!noc_file_dialog_free_ret_registered) {
+        atexit(&noc_file_dialog_free_ret);
+    }
+
+    free(g_noc_file_dialog_ret);
+
+    g_noc_file_dialog_ret = str;
+}
 
 #ifdef NOC_FILE_DIALOG_GTK
 
@@ -170,6 +188,8 @@ const char *noc_file_dialog_open(int flags,
         int n;
         char *tmp = NULL;
 
+        // http://stackoverflow.com/questions/8269696/
+
         if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_IFileDialog, (void **)&f))) {
             goto done;
         }
@@ -204,8 +224,7 @@ const char *noc_file_dialog_open(int flags,
             goto done;
         }
 
-        free(g_noc_file_dialog_ret);
-        g_noc_file_dialog_ret = tmp;
+        noc_file_dialog_set_ret(tmp);
         tmp = NULL;
 
         r = g_noc_file_dialog_ret;
@@ -252,8 +271,8 @@ const char *noc_file_dialog_open(int flags,
         else
             ret = GetSaveFileName(&ofn);
 
-        free(g_noc_file_dialog_ret);
-        g_noc_file_dialog_ret = ret ? strdup(szFile) : NULL;
+        noc_file_dialog_set_ret(ret ? strdup(szFile) : NULL);
+
         return g_noc_file_dialog_ret;
     }
 }
