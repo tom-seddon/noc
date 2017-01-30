@@ -172,6 +172,75 @@ const char *noc_file_dialog_open(int flags,
 #include <ShlObj.h>
 #include <ShObjIdl.h>
 
+// free result when done.
+static WCHAR *GetWideString(const char *utf8_string) {
+    int num_chars;
+    WCHAR *buf = NULL;
+    int good = 0;
+    UINT codepage = CP_UTF8;
+    DWORD flags = MB_ERR_INVALID_CHARS;
+
+    num_chars = MultiByteToWideChar(codepage, flags, utf8_string, -1, NULL, 0);
+    if (num_chars == 0) {
+        goto done;
+    }
+
+    buf = (WCHAR *)malloc(num_chars * sizeof *buf);
+    if (!buf) {
+        goto done;
+    }
+
+    if (MultiByteToWideChar(codepage, flags, utf8_string, -1, buf, num_chars) == 0) {
+        goto done;
+    }
+
+    good=1;
+
+done:;
+
+    if (!good) {
+        free(buf);
+        buf = NULL;
+    }
+
+    return buf;
+}
+
+// free result when done.
+static char *GetUTF8String(const WCHAR *wide_string) {
+    int num_bytes;
+    char *buf = NULL;
+    int good = 0;
+    UINT codepage = CP_UTF8;
+    DWORD flags = WC_ERR_INVALID_CHARS;
+
+    num_bytes = WideCharToMultiByte(codepage, flags, wide_string, -1, NULL, 0, NULL, NULL);
+    if (num_bytes == 0) {
+        goto done;
+    }
+
+    buf = (char *)malloc(num_bytes);
+    if (!buf) {
+        goto done;
+    }
+
+    if (WideCharToMultiByte(codepage, flags, wide_string, -1, buf, num_bytes, NULL, NULL) == 0) {
+        // unplausible... didn't it just succeed??
+        goto done;
+    }
+
+    good=1;
+
+done:;
+
+    if(!good) {
+        free(buf);
+        buf = NULL;
+    }
+
+    return buf;
+}
+
 const char *noc_file_dialog_open(int flags,
     const char *filters,
     const char *default_path,
@@ -184,11 +253,13 @@ const char *noc_file_dialog_open(int flags,
         const char *r = NULL;
         DWORD o;
         IShellItem *s = NULL;
-        WCHAR *w = NULL;
-        int n;
-        char *tmp = NULL;
+        WCHAR *result_w = NULL;
+        char *result_utf8 = NULL;
+        IShellFolder *sf = NULL;
 
         // http://stackoverflow.com/questions/8269696/
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/bb775075%28v=vs.85%29.aspx?f=255&MSPPError=-2147217396
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/ff934858.aspx?f=255&MSPPError=-2147217396
 
         if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_IFileDialog, (void **)&f))) {
             goto done;
@@ -196,6 +267,34 @@ const char *noc_file_dialog_open(int flags,
 
         f->lpVtbl->GetOptions(f,&o);
         f->lpVtbl->SetOptions(f,o | FOS_PICKFOLDERS);
+
+        if (default_path) {
+            WCHAR *default_path_w = NULL;
+            IShellItem *default_path_item = NULL;
+
+            // If anything goes wrong here, rather than crapping out
+            // entirely, just skip this bit.
+
+            default_path_w = GetWideString(default_path);
+            if (!default_path_w) {
+                goto default_path_done;
+            }
+
+            if (FAILED(SHCreateItemFromParsingName(default_path_w, NULL, IID_IShellItem, (void **)&default_path_item))) {
+                goto default_path_done;
+            }
+
+            f->lpVtbl->SetFolder(f, default_path_item);
+
+        default_path_done:;
+            if (default_path_item) {
+                default_path_item->lpVtbl->Release(default_path_item);
+                default_path_item = NULL;
+            }
+
+            free(default_path_w);
+            default_path_w = NULL;
+        }
 
         if (FAILED(f->lpVtbl->Show(f, NULL))) {
             goto done;
@@ -205,27 +304,17 @@ const char *noc_file_dialog_open(int flags,
             goto done;
         }
 
-        if (FAILED(s->lpVtbl->GetDisplayName(s, SIGDN_DESKTOPABSOLUTEPARSING, &w))) {
+        if (FAILED(s->lpVtbl->GetDisplayName(s, SIGDN_DESKTOPABSOLUTEPARSING, &result_w))) {
             goto done;
         }
 
-        n = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w, -1, NULL, 0, NULL, NULL);
-        if (n == 0) {
+        result_utf8 = GetUTF8String(result_w);
+        if (!result_utf8) {
             goto done;
         }
 
-        tmp = (char *)malloc(n + 1);
-        if (!tmp) {
-            goto done;
-        }
-
-        if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w, -1, tmp, n + 1, NULL, NULL) == 0) {
-            // unplausible... didn't it just succeed??
-            goto done;
-        }
-
-        noc_file_dialog_set_ret(tmp);
-        tmp = NULL;
+        noc_file_dialog_set_ret(result_utf8);
+        result_utf8 = NULL;
 
         r = g_noc_file_dialog_ret;
 
@@ -240,13 +329,16 @@ const char *noc_file_dialog_open(int flags,
             s = NULL;
         }
 
-        if (w) {
-            CoTaskMemFree(w);
-            w = NULL;
+        CoTaskMemFree(result_w);
+        result_w = NULL;
+
+        if (sf) {
+            sf->lpVtbl->Release(sf);
+            sf = NULL;
         }
 
-        free(tmp);
-        tmp = NULL;
+        free(result_utf8);
+        result_utf8 = NULL;
 
         return r;
     } else {
@@ -263,7 +355,7 @@ const char *noc_file_dialog_open(int flags,
         ofn.nFilterIndex = 1;
         ofn.lpstrFileTitle = NULL;
         ofn.nMaxFileTitle = 0;
-        ofn.lpstrInitialDir = NULL;
+        ofn.lpstrInitialDir = default_path;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
         if (flags & NOC_FILE_DIALOG_OPEN)
