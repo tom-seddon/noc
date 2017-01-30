@@ -150,36 +150,112 @@ const char *noc_file_dialog_open(int flags,
 
 #include <windows.h>
 #include <commdlg.h>
+#define CINTERFACE
+#include <ShlObj.h>
+#include <ShObjIdl.h>
 
 const char *noc_file_dialog_open(int flags,
-                                 const char *filters,
-                                 const char *default_path,
-                                 const char *default_name)
+    const char *filters,
+    const char *default_path,
+    const char *default_name)
 {
-    OPENFILENAME ofn;       // common dialog box structure
-    char szFile[260];       // buffer for file name
-    int ret;
+    (void)default_path, (void)default_name;
 
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.lpstrFile = szFile;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(szFile);
-    ofn.lpstrFilter = filters;
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
-    ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = NULL;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    if (flags & NOC_FILE_DIALOG_DIR) {
+        IFileDialog *f = NULL;
+        const char *r = NULL;
+        DWORD o;
+        IShellItem *s = NULL;
+        WCHAR *w = NULL;
+        int n;
+        char *tmp = NULL;
 
-    if (flags & NOC_FILE_DIALOG_OPEN)
-        ret = GetOpenFileName(&ofn);
-    else
-        ret = GetSaveFileName(&ofn);
+        if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_IFileDialog, (void **)&f))) {
+            goto done;
+        }
 
-    free(g_noc_file_dialog_ret);
-    g_noc_file_dialog_ret = ret ? strdup(szFile) : NULL;
-    return g_noc_file_dialog_ret;
+        f->lpVtbl->GetOptions(f,&o);
+        f->lpVtbl->SetOptions(f,o | FOS_PICKFOLDERS);
+
+        if (FAILED(f->lpVtbl->Show(f, NULL))) {
+            goto done;
+        }
+
+        if (FAILED(f->lpVtbl->GetResult(f, &s))) {
+            goto done;
+        }
+
+        if (FAILED(s->lpVtbl->GetDisplayName(s, SIGDN_DESKTOPABSOLUTEPARSING, &w))) {
+            goto done;
+        }
+
+        n = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w, -1, NULL, 0, NULL, NULL);
+        if (n == 0) {
+            goto done;
+        }
+
+        tmp = (char *)malloc(n + 1);
+        if (!tmp) {
+            goto done;
+        }
+
+        if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w, -1, tmp, n + 1, NULL, NULL) == 0) {
+            // unplausible... didn't it just succeed??
+            goto done;
+        }
+
+        free(g_noc_file_dialog_ret);
+        g_noc_file_dialog_ret = tmp;
+        tmp = NULL;
+
+        r = g_noc_file_dialog_ret;
+
+    done:;
+        if(f) {
+            f->lpVtbl->Release(f);
+            f = NULL;
+        }
+
+        if (s) {
+            s->lpVtbl->Release(s);
+            s = NULL;
+        }
+
+        if (w) {
+            CoTaskMemFree(w);
+            w = NULL;
+        }
+
+        free(tmp);
+        tmp = NULL;
+
+        return r;
+    } else {
+        OPENFILENAMEA ofn;       // common dialog box structure
+        char szFile[260];       // buffer for file name
+        int ret;
+
+        ZeroMemory(&ofn, sizeof(ofn));
+        ofn.lStructSize = sizeof(ofn);
+        ofn.lpstrFile = szFile;
+        ofn.lpstrFile[0] = '\0';
+        ofn.nMaxFile = sizeof(szFile);
+        ofn.lpstrFilter = filters;
+        ofn.nFilterIndex = 1;
+        ofn.lpstrFileTitle = NULL;
+        ofn.nMaxFileTitle = 0;
+        ofn.lpstrInitialDir = NULL;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+        if (flags & NOC_FILE_DIALOG_OPEN)
+            ret = GetOpenFileName(&ofn);
+        else
+            ret = GetSaveFileName(&ofn);
+
+        free(g_noc_file_dialog_ret);
+        g_noc_file_dialog_ret = ret ? strdup(szFile) : NULL;
+        return g_noc_file_dialog_ret;
+    }
 }
 
 #endif
