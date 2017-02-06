@@ -430,12 +430,13 @@ const char *noc_file_dialog_open(int flags,
         [panel setAllowedFileTypes:types_array];
     }
 
-    free(g_noc_file_dialog_ret);
-    g_noc_file_dialog_ret = NULL;
+    noc_file_dialog_set_ret(NULL);
+    
     if ( [panel runModal] == NSModalResponseOK ) {
         url = [panel URL];
         utf8_path = [[url path] UTF8String];
-        g_noc_file_dialog_ret = strdup(utf8_path);
+
+        noc_file_dialog_set_ret(strdup(utf8_path));
     }
 
     [pool release];
