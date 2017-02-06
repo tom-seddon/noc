@@ -395,7 +395,7 @@ const char *noc_file_dialog_open(int flags,
     // if I leak memory here.
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
-    if (flags & NOC_FILE_DIALOG_OPEN) {
+    if (flags & (NOC_FILE_DIALOG_OPEN | NOC_FILE_DIALOG_DIR)) {
         panel = open_panel = [NSOpenPanel openPanel];
     } else {
         panel = [NSSavePanel savePanel];
