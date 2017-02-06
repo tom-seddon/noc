@@ -387,6 +387,9 @@ const char *noc_file_dialog_open(int flags,
     NSMutableArray *types_array;
     NSURL *default_url;
     char buf[128], *patterns;
+
+    (void)default_name;
+    
     // XXX: I don't know about memory management with cococa, need to check
     // if I leak memory here.
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
