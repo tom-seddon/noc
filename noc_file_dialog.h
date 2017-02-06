@@ -54,6 +54,7 @@ enum {
  *                      "png\0*.png\0jpeg\0*.jpeg\0"
  *                    You can also separate patterns with ';':
  *                      "jpeg\0*.jpg;*.jpeg\0"
+ *                    All patterns must be of the form "*.ext".
  *                    Set to NULL for no filter.
  * default_path     : the default file to use or NULL.
  * default_name     : the default file name to use or NULL.
