@@ -262,7 +262,7 @@ const char *noc_file_dialog_open(int flags,
         // https://msdn.microsoft.com/en-us/library/windows/desktop/bb775075%28v=vs.85%29.aspx?f=255&MSPPError=-2147217396
         // https://msdn.microsoft.com/en-us/library/windows/desktop/ff934858.aspx?f=255&MSPPError=-2147217396
 
-        if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_IFileDialog, (void **)&f))) {
+        if (FAILED(CoCreateInstance(&CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, &IID_IFileDialog, (void **)&f))) {
             goto done;
         }
 
@@ -281,7 +281,7 @@ const char *noc_file_dialog_open(int flags,
                 goto default_path_done;
             }
 
-            if (FAILED(SHCreateItemFromParsingName(default_path_w, NULL, IID_IShellItem, (void **)&default_path_item))) {
+            if (FAILED(SHCreateItemFromParsingName(default_path_w, NULL, &IID_IShellItem, (void **)&default_path_item))) {
                 goto default_path_done;
             }
 
