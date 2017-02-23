@@ -153,11 +153,10 @@ const char *noc_file_dialog_open(int flags,
 
     res = gtk_dialog_run(GTK_DIALOG(dialog));
 
-    free(g_noc_file_dialog_ret);
-    g_noc_file_dialog_ret = NULL;
+    noc_file_dialog_set_ret(NULL);
 
     if (res == GTK_RESPONSE_ACCEPT)
-        g_noc_file_dialog_ret = gtk_file_chooser_get_filename(chooser);
+        noc_file_dialog_set_ret(gtk_file_chooser_get_filename(chooser));
     gtk_widget_destroy(dialog);
     while (gtk_events_pending()) gtk_main_iteration();
     return g_noc_file_dialog_ret;
