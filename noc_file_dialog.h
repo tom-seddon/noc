@@ -356,12 +356,20 @@ const char *noc_file_dialog_open(int flags,
         ofn.lpstrFileTitle = NULL;
         ofn.nMaxFileTitle = 0;
         ofn.lpstrInitialDir = default_path;
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
-        if (flags & NOC_FILE_DIALOG_OPEN)
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+        if (flags & NOC_FILE_DIALOG_OPEN) {
+            ofn.Flags |= OFN_FILEMUSTEXIST;
+
             ret = GetOpenFileName(&ofn);
-        else
+        } else {
+            if (flags & NOC_FILE_DIALOG_OVERWRITE_CONFIRMATION) {
+                ofn.Flags |= OFN_OVERWRITEPROMPT;
+            }
+
             ret = GetSaveFileName(&ofn);
+        }
 
         noc_file_dialog_set_ret(ret ? strdup(szFile) : NULL);
 
