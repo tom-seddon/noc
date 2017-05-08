@@ -445,7 +445,6 @@ const char *noc_file_dialog_open(int flags,
     noc_file_dialog_set_ret(NULL);
 
     key_window = [NSApp keyWindow];
-    fprintf(stderr,"key_window=%p\n",(void *)key_window);
 
     if ( [panel runModal] == NSModalResponseOK ) {
         url = [panel URL];
