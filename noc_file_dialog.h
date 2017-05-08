@@ -395,6 +395,7 @@ const char *noc_file_dialog_open(int flags,
     NSMutableArray *types_array;
     NSURL *default_url;
     char buf[128], *patterns;
+    NSWindow *key_window;
 
     (void)default_name;
     
@@ -442,12 +443,27 @@ const char *noc_file_dialog_open(int flags,
     }
 
     noc_file_dialog_set_ret(NULL);
-    
+
+    key_window = [NSApp keyWindow];
+    fprintf(stderr,"key_window=%p\n",(void *)key_window);
+
     if ( [panel runModal] == NSModalResponseOK ) {
         url = [panel URL];
         utf8_path = [[url path] UTF8String];
 
         noc_file_dialog_set_ret(strdup(utf8_path));
+    }
+
+    /* In my SDL app, for some reason, OS X doesn't seem to do this
+     * automatically, even though it's in an app bundle with an
+     * Info.plist and otherwise seems to behave normally.
+     *
+     * It's quite possible that this is just some artefact of not
+     * being a proper 100% Cocoa app. But I'm only using noc because
+     * my program isn't a proper Cocoa app in the first place...
+     */
+    if (key_window) {
+        [key_window makeKeyWindow];
     }
 
     [pool release];
