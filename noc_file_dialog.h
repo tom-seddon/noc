@@ -68,6 +68,8 @@ const char *noc_file_dialog_open(int flags,
                                  const char *default_path,
                                  const char *default_name);
 
+int noc_file_dialog_get_filter_index();
+
 #ifdef NOC_FILE_DIALOG_IMPLEMENTATION
 
 #include <stdlib.h>
@@ -75,6 +77,7 @@ const char *noc_file_dialog_open(int flags,
 
 static char *g_noc_file_dialog_ret = NULL;
 static int noc_file_dialog_free_ret_registered = 0;
+static int noc_file_dialog_last_filter_index = -1;
 
 static void noc_file_dialog_free_ret(void)
 {
@@ -91,6 +94,11 @@ static void noc_file_dialog_set_ret(char *str)
     free(g_noc_file_dialog_ret);
 
     g_noc_file_dialog_ret = str;
+}
+
+int noc_file_dialog_get_filter_index()
+{
+    return noc_file_dialog_last_filter_index - 1;
 }
 
 #ifdef NOC_FILE_DIALOG_GTK
@@ -371,7 +379,16 @@ const char *noc_file_dialog_open(int flags,
             ret = GetSaveFileName(&ofn);
         }
 
-        noc_file_dialog_set_ret(ret ? strdup(szFile) : NULL);
+        if (ret)
+        {
+            noc_file_dialog_set_ret(strdup(szFile));
+            noc_file_dialog_last_filter_index = ofn.nFilterIndex;
+        }
+        else
+        {
+            noc_file_dialog_set_ret(NULL);
+            noc_file_dialog_last_filter_index = -1;
+        }
 
         return g_noc_file_dialog_ret;
     }
